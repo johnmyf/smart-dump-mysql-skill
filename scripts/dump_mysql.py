@@ -94,7 +94,11 @@ def mysqldump_cmd(conn, extra=None):
     cmd = [
         "mysqldump",
         f"--default-character-set={CHARSET}",
-        "--connect-timeout=10",
+        # RDS 等托管实例上低权限账号的兼容参数
+        "--no-tablespaces",
+        "--skip-masking-policies",
+        "--skip-lock-tables",
+        "--set-gtid-purged=OFF",
         "-h",
         conn.host,
         "-P",
@@ -231,6 +235,18 @@ def get_count(conn, db, table):
     return int(out.strip())
 
 
+def approx_rows(conn, db, table):
+    """从 information_schema.TABLES 取近似行数, 避免对大表执行 COUNT(1)。"""
+    esc_db = db.replace(chr(39), chr(39) * 2)
+    esc_table = table.replace(chr(39), chr(39) * 2)
+    out = query(
+        conn,
+        "SELECT TABLE_ROWS FROM information_schema.TABLES "
+        f"WHERE TABLE_SCHEMA = '{esc_db}' AND TABLE_NAME = '{esc_table}'",
+    ).strip()
+    return int(out) if out else None
+
+
 def extract_create_database(conn, db):
     """用 mysqldump --databases 只取 CREATE DATABASE 语句。"""
     dump = run(
@@ -281,6 +297,10 @@ def write_placeholder(out_dir, table, note):
 
 
 def dump_table(conn, db, table, out_dir, max_rows):
+    approx = approx_rows(conn, db, table)
+    if approx is not None and approx > max_rows:
+        reason = f"行数约 {approx} 超过阈值 {max_rows}"
+        return write_placeholder(out_dir, table, f"表 {table} {reason}, 跳过数据导出")
     count = get_count(conn, db, table)
     if count == 0 or count > max_rows:
         reason = "行数为 0" if count == 0 else f"行数 {count} 超过阈值 {max_rows}"
@@ -292,7 +312,6 @@ def dump_table(conn, db, table, out_dir, max_rows):
                 "--compact",
                 "--no-create-info",
                 "--skip-triggers",
-                "--single-transaction",
                 "--complete-insert",
                 "--extended-insert",
                 db,

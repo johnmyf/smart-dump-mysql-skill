@@ -62,9 +62,11 @@ MYSQL_PWD='密码' mysql --default-character-set=utf8mb4 --connect-timeout=10 \
 
      ```bash
      mysqldump --default-character-set=utf8mb4 --no-create-info --skip-triggers \
-       --skip-add-drop-table --single-transaction --quick --complete-insert --extended-insert \
+       --skip-add-drop-table --quick --complete-insert --extended-insert \
        {数据库名} {table_name}
      ```
+     RDS 等托管实例低权限账号需额外加 `--no-tablespaces --skip-masking-policies
+     --skip-lock-tables --set-gtid-purged=OFF`（脚本已默认带上）。
 3. 视图没有可导出的数据，一律按 count_0 占位处理，不执行数据导出。
 
 ## 执行方式

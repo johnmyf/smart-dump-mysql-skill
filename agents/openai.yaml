@@ -1,0 +1,7 @@
+interface:
+  display_name: "智能 MySQL Dump"
+  short_description: "按需导出 MySQL 数据库结构、数据与建库脚本文件"
+  default_prompt: "使用 $smart-dump-mysql-skill 导出 MySQL 数据库的结构与数据"
+
+policy:
+  allow_implicit_invocation: false
